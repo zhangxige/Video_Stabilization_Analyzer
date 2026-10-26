@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+outputs/
+checkpoints/
+*.pth
+*.egg-info/
+dist/
+build/
+
+# local test media (not part of the project)
+test*.mp4

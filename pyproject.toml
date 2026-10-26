@@ -1,0 +1,53 @@
+[project]
+name = "video-stabilization-analyzer"
+version = "0.1.0"
+description = "Evaluate video stabilization quality from tracked trajectories"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+keywords = [
+    "video stabilization",
+    "jitter",
+    "camera motion",
+    "cotracker",
+    "opencv",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+dependencies = [
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "opencv-python-headless>=4.9",
+]
+
+[project.optional-dependencies]
+cotracker = [
+    "einops>=0.7",
+    "torch>=2.2",
+    "torchvision>=0.17",
+]
+
+[project.scripts]
+video-stabilization-analyzer = "video_stabilization_analyzer.cli:main"
+vsa = "video_stabilization_analyzer.cli:main"
+vsa-batch = "video_stabilization_analyzer.batch:main"
+
+[build-system]
+requires = ["uv_build>=0.11.12,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
