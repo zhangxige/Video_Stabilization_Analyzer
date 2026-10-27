@@ -3,6 +3,28 @@
 Evaluate the stabilization quality of one video or a batch of videos by
 tracking points with CoTracker3 and analyzing the residual camera motion.
 
+## Demo
+
+Annotated CoTracker3 tracks (green = background/camera points) and the resulting
+report card for a deliberately shaky handheld clip. The low score is the
+expected detection result, not a stabilized output:
+
+![Annotated tracking and stability metrics for test4.mp4](docs/assets/test4-demo.gif)
+
+| Metric | Value |
+|---|---:|
+| Stability score | **19.2 / 100** |
+| High-pass RMS jitter | 9.91 px (0.826% of frame diagonal) |
+| P95 jitter | 19.28 px |
+| Rotation jitter | 0.20 deg |
+| Scale jitter | 0.28% |
+| Background points | 144 / 144 |
+| Evaluated frames | 43 / 53 |
+| Confidence | high |
+
+The source clip (`test4.mp4`) is a local test asset and is not bundled; the GIF
+is generated from the annotated tracking video written by `--output-video`.
+
 ## Pipeline
 
 1. Decode sampled frames and downscale them to a configurable maximum side.
