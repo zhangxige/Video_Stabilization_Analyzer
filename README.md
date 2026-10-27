@@ -9,7 +9,11 @@ Annotated CoTracker3 tracks (green = background/camera points) and the resulting
 report card for a deliberately shaky handheld clip. The low score is the
 expected detection result, not a stabilized output:
 
-![Annotated tracking and stability metrics for test4.mp4](docs/assets/test4-demo.gif)
+![Annotated tracking and stability metrics for test4.mp4](https://cdn.jsdelivr.net/gh/zhangxige/Video_Stabilization_Analyzer@main/docs/assets/test4-demo.gif)
+
+The GIF lives at `docs/assets/test4-demo.gif`; it is served through jsDelivr
+because GitHub's own repo image URLs redirect to `raw.githubusercontent.com`,
+which is unreachable on some networks.
 
 | Metric | Value |
 |---|---:|
