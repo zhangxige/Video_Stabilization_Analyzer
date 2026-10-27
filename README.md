@@ -6,15 +6,10 @@ tracking points with CoTracker3 and analyzing the residual camera motion.
 ## Demo
 
 Annotated CoTracker3 tracks (green = background/camera points) and the resulting
-report card for a deliberately shaky handheld clip, sampled from the demo video.
-The low score is the expected detection result, not a stabilized output:
+report card for a deliberately shaky handheld clip. The low score is the
+expected detection result, not a stabilized output:
 
-![Annotated tracking and stability metrics for test4.mp4](docs/assets/test4-demo-stills.png)
-
-Animated version: [`docs/assets/test4-demo.gif`](docs/assets/test4-demo.gif).
-
-The stills are frames taken from the annotated tracking video written by
-`--output-video`; the report card shows the metrics of the same run.
+![Annotated tracking and stability metrics for test4.mp4](docs/assets/test4-demo.gif)
 
 | Metric | Value |
 |---|---:|
