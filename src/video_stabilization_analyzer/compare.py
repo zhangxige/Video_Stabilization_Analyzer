@@ -619,7 +619,7 @@ def write_outputs(
     *,
     plot: bool = True,
 ) -> dict[str, Path]:
-    """Write JSON, CSV, Markdown and an optional heatmap."""
+    """Write JSON, CSV, Markdown, the dashboard and an optional heatmap."""
     output_dir.mkdir(parents=True, exist_ok=True)
     paths: dict[str, Path] = {}
 
@@ -663,11 +663,23 @@ def write_outputs(
         ],
         list(comparison["products"]),
     )
-    paths["markdown"] = _write_markdown(comparison, output_dir / "comparison.md")
+    heatmap_requested = plot and len(comparison["groups"]) > 1
+    paths["markdown"] = _write_markdown(
+        comparison,
+        output_dir / "comparison.md",
+        dashboard=plot,
+        heatmap=heatmap_requested,
+    )
     if plot:
-        plot_path = save_comparison_plot(comparison, output_dir / "comparison.png")
+        plot_path = save_comparison_dashboard(comparison, output_dir / "comparison.png")
         if plot_path is not None:
             paths["plot"] = plot_path
+        if heatmap_requested:
+            heatmap_path = save_comparison_heatmap(
+                comparison, output_dir / "comparison-heatmap.png"
+            )
+            if heatmap_path is not None:
+                paths["heatmap"] = heatmap_path
     return paths
 
 
@@ -677,7 +689,25 @@ def _format_float(value: object, digits: int = 2) -> str:
     return f"{float(value):.{digits}f}"
 
 
-def _write_markdown(comparison: dict[str, object], path: Path) -> Path:
+def _jitter_marker(relative: object) -> str:
+    """Traffic-light marker for a clip's jitter relative to the group best."""
+    if relative is None:
+        return ""
+    value = float(relative)
+    if value <= 1.05:
+        return "🟢"
+    if value <= 2.0:
+        return "🟠"
+    return "🔴"
+
+
+def _write_markdown(
+    comparison: dict[str, object],
+    path: Path,
+    *,
+    dashboard: bool = True,
+    heatmap: bool = False,
+) -> Path:
     settings = comparison["settings"]
     if settings.get("target_fps"):
         sample_text = f"{float(settings['target_fps']):g} Hz"
@@ -700,7 +730,16 @@ def _write_markdown(comparison: dict[str, object], path: Path) -> Path:
         f"- Window alignment: {'on' if settings.get('align_window') else 'off'}",
         f"- Target sample rate: {sample_text}",
         "",
+        "Markers: 🟢 within 5% of the group best, 🟠 up to 2x, 🔴 above 2x.",
+        "",
     ]
+
+    if dashboard:
+        lines.extend(["![Comparison dashboard](comparison.png)", ""])
+    if heatmap:
+        lines.extend(
+            ["![Relative jitter heatmap](comparison-heatmap.png)", ""]
+        )
 
     for group in comparison["groups"]:
         lines.extend(
@@ -731,8 +770,16 @@ def _write_markdown(comparison: dict[str, object], path: Path) -> Path:
                 ]
             )
         if group["ranking"]:
+            leader = group["ranking"][0]
             lines.extend(
                 [
+                    "**Best: {product}** — score {score}, jitter {relative} vs the "
+                    "group best.".format(
+                        product=leader["product"],
+                        score=_format_float(leader["score"], 1),
+                        relative=f"{float(leader['relative_jitter']):.2f}x",
+                    ),
+                    "",
                     "| Rank | Product | Score | RMS jitter (diag.) | Relative | Confidence |",
                     "|---:|---|---:|---:|---:|---|",
                 ]
@@ -744,7 +791,10 @@ def _write_markdown(comparison: dict[str, object], path: Path) -> Path:
                         product=row["product"],
                         score=_format_float(row["score"], 1),
                         ratio=f"{float(row['rms_jitter_ratio']) * 100:.3f}%",
-                        relative=f"{float(row['relative_jitter']):.2f}x",
+                        relative=(
+                            f"{_jitter_marker(row['relative_jitter'])} "
+                            f"{float(row['relative_jitter']):.2f}x"
+                        ),
                         confidence=row["confidence"],
                     )
                 )
@@ -768,7 +818,7 @@ def _write_markdown(comparison: dict[str, object], path: Path) -> Path:
         for product in comparison["products"]:
             lines.append(
                 "| {rank} | {product} | {groups} | {wins} | {mean_rank} | "
-                "{mean_score} | {geo} |".format(
+                "{mean_score} | {marker} {geo} |".format(
                     rank=product["rank"],
                     product=product["product"],
                     groups=product["groups"],
@@ -776,6 +826,7 @@ def _write_markdown(comparison: dict[str, object], path: Path) -> Path:
                     mean_rank=_format_float(product["mean_rank"]),
                     mean_score=_format_float(product["mean_score"], 1),
                     geo=f"{float(product['geometric_mean_relative_jitter']):.2f}x",
+                    marker=_jitter_marker(product["geometric_mean_relative_jitter"]),
                 )
             )
         lines.append("")
@@ -790,9 +841,180 @@ def _write_markdown(comparison: dict[str, object], path: Path) -> Path:
     return path
 
 
-def save_comparison_plot(
+def save_comparison_dashboard(
     comparison: dict[str, object], path: Path | str
 ) -> Path | None:
+    """Draw the readable overview: product ranking plus per-group jitter bars."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    groups = comparison["groups"]
+    products = comparison["products"]
+    if not groups or not products:
+        return None
+
+    palette = plt.get_cmap("tab10")
+    colors = {
+        str(product["product"]): palette(index % 10)
+        for index, product in enumerate(products)
+    }
+
+    has_summary = len(groups) > 1
+    columns = 1 if not has_summary else (2 if len(groups) <= 4 else 3)
+    rows = math.ceil(len(groups) / columns)
+    height = (3.6 + 2.7 * rows) if has_summary else (2.4 + 2.6 * rows)
+    figure = plt.figure(figsize=(max(9.5, 4.8 * columns), height))
+    height_ratios = ([1.35] if has_summary else []) + [1.0] * rows
+    grid = figure.add_gridspec(
+        rows + (1 if has_summary else 0),
+        columns,
+        height_ratios=height_ratios,
+        hspace=0.55,
+        wspace=0.35,
+    )
+    figure.suptitle(
+        "Stabilization comparison — lower high-pass jitter is better",
+        fontsize=13,
+        fontweight="bold",
+    )
+
+    if has_summary:
+        summary_ax = figure.add_subplot(grid[0, :])
+    else:
+        summary_ax = None
+    summary = sorted(comparison["products"], key=lambda item: int(item["rank"]))
+    summary_values = []
+    if summary_ax is not None:
+        summary_values = [
+            float(product["geometric_mean_relative_jitter"]) for product in summary
+        ]
+        positions = np.arange(len(summary))
+        summary_ax.barh(
+            positions,
+            summary_values,
+            color=[colors[str(product["product"])] for product in summary],
+            height=0.62,
+        )
+        summary_ax.set_yticks(
+            positions, [str(product["product"]) for product in summary]
+        )
+        summary_ax.invert_yaxis()
+        limit = max(summary_values) * 1.45 if summary_values else 1.5
+        summary_ax.set_xlim(0.0, limit)
+        summary_ax.set_xlabel(
+            "geometric-mean jitter vs group best (1.00 = wins every group)",
+            fontsize=8.5,
+        )
+        summary_ax.set_title(
+            "Product ranking", loc="left", fontsize=11, fontweight="bold"
+        )
+        summary_ax.grid(axis="x", alpha=0.25)
+        summary_ax.set_axisbelow(True)
+        for spine in ("top", "right"):
+            summary_ax.spines[spine].set_visible(False)
+        for position, product in zip(positions, summary):
+            value = float(product["geometric_mean_relative_jitter"])
+            label = (
+                f"{value:.2f}x · mean rank {_format_float(product['mean_rank'])} · "
+                f"{product['wins']}/{product['groups']} wins"
+            )
+            if int(product["rank"]) == 1:
+                label = f"★ {label}"
+            summary_ax.text(
+                value + limit * 0.015,
+                position,
+                label,
+                va="center",
+                fontsize=8.5,
+            )
+
+    row_offset = 1 if has_summary else 0
+    for index, group in enumerate(groups):
+        axis = figure.add_subplot(
+            grid[row_offset + index // columns, index % columns]
+        )
+        ranking = list(group["ranking"])
+        title = f"Group {group['group']} · {group['evaluated']} clips"
+        if group["within_noise"]:
+            title += " · tie"
+        axis.set_title(title, loc="left", fontsize=10, fontweight="bold")
+        if not ranking:
+            axis.text(0.5, 0.5, "no comparable clips", ha="center", va="center")
+            axis.set_axis_off()
+            continue
+
+        values = [float(row["relative_jitter"]) for row in ranking]
+        positions = np.arange(len(ranking))
+        edges = [
+            "#1b1b1b" if int(row["rank"]) == 1 else "none" for row in ranking
+        ]
+        widths = [1.8 if int(row["rank"]) == 1 else 0.8 for row in ranking]
+        axis.barh(
+            positions,
+            values,
+            color=[colors[str(row["product"])] for row in ranking],
+            height=0.62,
+            edgecolor=edges,
+            linewidth=widths,
+        )
+        axis.set_yticks(positions, [str(row["product"]) for row in ranking])
+        axis.invert_yaxis()
+        upper = max(values) * 1.9 if values else 1.5
+        axis.set_xlim(0.0, max(upper, 1.15))
+        axis.set_xlabel("RMS jitter vs group best", fontsize=8)
+        axis.tick_params(axis="y", labelsize=8.5)
+        axis.tick_params(axis="x", labelsize=8)
+        axis.grid(axis="x", alpha=0.25)
+        axis.set_axisbelow(True)
+        for spine in ("top", "right"):
+            axis.spines[spine].set_visible(False)
+        for position, row in zip(positions, ranking):
+            label = (
+                f"{_format_float(row['score'], 1)} pts · "
+                f"{float(row['rms_jitter_ratio']) * 100:.3f}% · "
+                f"{float(row['relative_jitter']):.2f}x"
+            )
+            if int(row["rank"]) == 1 and group["within_noise"]:
+                label += " · tie"
+            axis.text(
+                float(row["relative_jitter"]) + upper * 0.025,
+                position,
+                label,
+                va="center",
+                fontsize=8,
+            )
+
+    settings = comparison["settings"]
+    footer = (
+        f"max side {settings.get('max_side') or 'source'} · "
+        f"high-pass {_format_float(settings.get('high_pass_cutoff_hz'))} Hz · "
+        f"window {'aligned' if settings.get('align_window') else 'per clip'} · "
+        f"sample rate "
+        + (
+            f"{float(settings['target_fps']):g} Hz"
+            if settings.get("target_fps")
+            else f"auto (cap {_format_float(settings.get('max_sample_fps'), 0)} Hz)"
+        )
+        + f" · tie threshold {100 * float(settings.get('tie_threshold', 0.03)):.0f}%"
+    )
+    figure.text(0.01, 0.012, footer, fontsize=8, color="#555555", ha="left")
+
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    bottom = 0.09 if has_summary else 0.115
+    figure.subplots_adjust(left=0.09, right=0.98, top=0.90, bottom=bottom)
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+    return output_path
+
+
+def save_comparison_heatmap(
+    comparison: dict[str, object], path: Path | str
+) -> Path | None:
+    """Draw the product-by-group matrix of relative jitter."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -819,8 +1041,7 @@ def save_comparison_plot(
     figure, axes = plt.subplots(
         figsize=(max(6.0, 2.5 + 1.1 * len(groups)), max(3.0, 1.2 + 0.55 * len(products)))
     )
-    colormap = matplotlib.colormaps["RdYlGn_r"].copy()
-    colormap.set_bad("#f0f0f0")
+    colormap = matplotlib.colormaps["RdYlGn_r"].with_extremes(bad="#f0f0f0")
     finite = matrix[np.isfinite(matrix)]
     upper = max(1.35, float(finite.max())) if finite.size else 1.5
     image = axes.imshow(
@@ -842,10 +1063,15 @@ def save_comparison_plot(
                 label,
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=9,
                 color="black",
+                fontweight="bold",
             )
-    axes.set_title("High-pass RMS jitter relative to the best clip in each group")
+    axes.set_title(
+        "High-pass RMS jitter relative to the best clip in each group",
+        fontsize=11,
+        fontweight="bold",
+    )
     figure.colorbar(image, ax=axes, label="relative jitter (1.00 = best)")
     figure.tight_layout()
     figure.savefig(output_path, dpi=150)
@@ -919,7 +1145,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="low",
         help="exclude clips below this confidence from rankings (default: low)",
     )
-    parser.add_argument("--no-plot", action="store_true", help="skip the heatmap")
+    parser.add_argument(
+        "--no-plot",
+        action="store_true",
+        help="skip the dashboard and heatmap images",
+    )
     parser.add_argument(
         "--quiet", action="store_true", help="suppress per-clip output"
     )

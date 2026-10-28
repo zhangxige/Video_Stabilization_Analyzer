@@ -395,3 +395,43 @@ def test_compare_cli_rejects_manifest_and_inputs(tmp_path: Path) -> None:
         )
 
     assert info.value.code == 1
+
+
+def test_write_outputs_draws_dashboard_and_heatmap(tmp_path: Path) -> None:
+    evaluations = [
+        _evaluation("g1", "a", 0.0010),
+        _evaluation("g1", "b", 0.0020),
+        _evaluation("g2", "a", 0.0015),
+        _evaluation("g2", "b", 0.0030),
+    ]
+    comparison = build_comparison(evaluations, {}, {})
+
+    paths = compare.write_outputs(comparison, tmp_path)
+
+    assert paths["plot"] == tmp_path / "comparison.png"
+    assert paths["heatmap"] == tmp_path / "comparison-heatmap.png"
+    assert paths["plot"].stat().st_size > 0
+    assert paths["heatmap"].stat().st_size > 0
+
+    markdown = (tmp_path / "comparison.md").read_text(encoding="utf-8")
+    assert "![Comparison dashboard](comparison.png)" in markdown
+    assert "![Relative jitter heatmap](comparison-heatmap.png)" in markdown
+    assert "🟢 1.00x" in markdown
+    assert "🟠 2.00x" in markdown
+    assert "**Best: a**" in markdown
+
+
+def test_write_outputs_skips_heatmap_for_single_group(tmp_path: Path) -> None:
+    evaluations = [
+        _evaluation("g", "a", 0.0010),
+        _evaluation("g", "b", 0.0020),
+    ]
+    comparison = build_comparison(evaluations, {}, {})
+
+    paths = compare.write_outputs(comparison, tmp_path)
+
+    assert "plot" in paths
+    assert "heatmap" not in paths
+    assert not (tmp_path / "comparison-heatmap.png").exists()
+    markdown = (tmp_path / "comparison.md").read_text(encoding="utf-8")
+    assert "comparison-heatmap.png" not in markdown

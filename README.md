@@ -304,8 +304,13 @@ rejected so one clip cannot be counted twice.
 - Clips are resampled to the lowest group FPS, capped by `--max-sample-fps`
   (default 30), so a 60 fps phone and a 30 fps phone are compared at the same
   rate.
-- `comparison.json`, `clips.csv`, `products.csv`, `comparison.md`, and
-  `comparison.png` (heatmap) summarize the run.
+- `comparison.png` is the dashboard: product ranking plus one bar panel per
+  scene group, annotated with score, RMS jitter, and jitter vs the group best.
+- `comparison-heatmap.png` shows the product × scene matrix when there is more
+  than one group.
+- `comparison.json`, `clips.csv`, `products.csv`, and `comparison.md` carry the
+  full numbers; the Markdown embeds both images and marks each clip 🟢 (within
+  5% of the group best), 🟠 (up to 2x), or 🔴 (above 2x).
 - `relative` is the clip's RMS jitter divided by the best clip in its group
   (1.00 = best). Product order uses the mean within-group rank and the
   geometric mean of that ratio.

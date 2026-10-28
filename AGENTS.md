@@ -24,7 +24,7 @@
 - `analysis.py`: orchestration and user-facing warnings (truncation, VFR, low confidence).
 - `metrics.py`: background classification, Huber-IRLS similarity camera model, zero-phase 4th-order Butterworth high-pass, edge trim, confidence, score. Keep this layer numpy-only so it is testable on synthetic trajectories.
 - `report.py`, `plotting.py`, `visualization.py`, `cli.py`, `batch.py`: output and entry layers. `visualization.py` draws background/foreground points and trails onto sampled frames.
-- `compare.py`: `vsa-compare` grouped comparison. Probes container metadata, plans a common window (shortest clip) and sample rate per scene group, runs the normal pipeline per clip, then writes `comparison.json`, `clips.csv`, `products.csv`, `comparison.md`, and a relative-jitter heatmap. Inputs come from `clips/<group>/<product>.mp4` or a `path,group,product` CSV/JSON manifest.
+- `compare.py`: `vsa-compare` grouped comparison. Probes container metadata, plans a common window (shortest clip) and sample rate per scene group, runs the normal pipeline per clip, then writes `comparison.json`, `clips.csv`, `products.csv`, `comparison.md`, a dashboard PNG (`comparison.png`), and a product×group relative-jitter heatmap (`comparison-heatmap.png`, only for 2+ groups). Inputs come from `clips/<group>/<product>.mp4` or a `path,group,product` CSV/JSON manifest.
 - `tests/`: synthetic-trajectory, CLI, batch, compare, report, plotting, stitching, visualization, and OpenCV video tests. No CoTracker integration test (network/GPU).
 
 ## Gotchas
