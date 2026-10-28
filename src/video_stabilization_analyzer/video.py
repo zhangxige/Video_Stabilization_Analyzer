@@ -61,6 +61,57 @@ class VideoMetadata:
         }
 
 
+@dataclass(frozen=True)
+class VideoProbe:
+    """Container-level metadata read without decoding frames."""
+
+    path: Path
+    width: int
+    height: int
+    fps: float
+    frame_count: int
+
+    @property
+    def duration_seconds(self) -> float | None:
+        if self.fps <= 0 or self.frame_count <= 0:
+            return None
+        return self.frame_count / self.fps
+
+    @property
+    def frame_diagonal(self) -> float:
+        return float(np.hypot(self.width, self.height))
+
+
+def probe_video(path: Path | str) -> VideoProbe:
+    """Read resolution, FPS and frame count without decoding the video.
+
+    Useful for planning comparable analysis windows before the expensive
+    tracking step.
+    """
+    video_path = Path(path)
+    capture = cv2.VideoCapture(str(video_path))
+    if not capture.isOpened():
+        raise VideoReadError(f"could not open video: {video_path}")
+    try:
+        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        fps = float(capture.get(cv2.CAP_PROP_FPS) or 0.0)
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    finally:
+        capture.release()
+    if width <= 0 or height <= 0:
+        raise VideoReadError(f"video has no usable video stream: {video_path}")
+    if not np.isfinite(fps) or fps <= 0.0:
+        fps = 0.0
+    return VideoProbe(
+        path=video_path,
+        width=width,
+        height=height,
+        fps=fps,
+        frame_count=max(frame_count, 0),
+    )
+
+
 def _target_size(width: int, height: int, max_side: int | None) -> tuple[int, int]:
     if max_side is None:
         return width, height

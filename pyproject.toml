@@ -38,6 +38,7 @@ cotracker = [
 video-stabilization-analyzer = "video_stabilization_analyzer.cli:main"
 vsa = "video_stabilization_analyzer.cli:main"
 vsa-batch = "video_stabilization_analyzer.batch:main"
+vsa-compare = "video_stabilization_analyzer.compare:main"
 
 [build-system]
 requires = ["uv_build>=0.11.12,<0.12.0"]

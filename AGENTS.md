@@ -11,7 +11,7 @@
 - Python 3.12, managed exclusively with `uv`. Do not add `requirements.txt`, Poetry, conda, or a hand-managed venv.
 - `uv sync` installs the core app and dev tools.
 - `uv sync --extra cotracker` installs PyTorch/torchvision/einops for the real tracker. The extra is heavy; metrics tests must not require it.
-- Run the CLI with `uv run vsa <video> --output-dir outputs/<name>`; batch with `uv run vsa-batch "<glob>" --output-dir outputs/batch --csv outputs/batch/summary.csv`.
+- Run the CLI with `uv run vsa <video> --output-dir outputs/<name>`; batch with `uv run vsa-batch "<glob>" --output-dir outputs/batch --csv outputs/batch/summary.csv`; grouped product comparison with `uv run vsa-compare clips/ --output-dir outputs/compare`.
 - Tests: `uv run pytest`; single test: `uv run pytest tests/test_metrics.py::test_shaky_tracks_score_lower`.
 - CI: `.github/workflows/ci.yml` runs `uv sync --frozen`, `uv run --no-sync pytest`, and `uv build`.
 - No lint or typecheck command is configured.
@@ -24,7 +24,8 @@
 - `analysis.py`: orchestration and user-facing warnings (truncation, VFR, low confidence).
 - `metrics.py`: background classification, Huber-IRLS similarity camera model, zero-phase 4th-order Butterworth high-pass, edge trim, confidence, score. Keep this layer numpy-only so it is testable on synthetic trajectories.
 - `report.py`, `plotting.py`, `visualization.py`, `cli.py`, `batch.py`: output and entry layers. `visualization.py` draws background/foreground points and trails onto sampled frames.
-- `tests/`: synthetic-trajectory, CLI, batch, report, plotting, stitching, visualization, and OpenCV video tests. No CoTracker integration test (network/GPU).
+- `compare.py`: `vsa-compare` grouped comparison. Probes container metadata, plans a common window (shortest clip) and sample rate per scene group, runs the normal pipeline per clip, then writes `comparison.json`, `clips.csv`, `products.csv`, `comparison.md`, and a relative-jitter heatmap. Inputs come from `clips/<group>/<product>.mp4` or a `path,group,product` CSV/JSON manifest.
+- `tests/`: synthetic-trajectory, CLI, batch, compare, report, plotting, stitching, visualization, and OpenCV video tests. No CoTracker integration test (network/GPU).
 
 ## Gotchas
 
@@ -36,3 +37,5 @@
 - Rotation/scale jitter is converted to pixels with a `0.5 * frame_diagonal` lever arm. It is a representative weighting, not per-pixel ground truth.
 - Analysis coordinates are in the downscaled frame; pixel metrics are not comparable across different `--max-side` values. Use ratios for comparisons.
 - Keep tracking, metric computation, reporting, and visualization separable. The fake-tracker pattern in `tests/test_analysis.py` is the intended way to test pipeline changes without GPU/video.
+- `vsa-compare` assumes the clips in one group show the same scene and only differ by capture device/stabilization. It aligns the shortest clip's window and resamples to the lowest group FPS (capped by `--max-sample-fps`), but it cannot correct different crops/FOV, exposure, or rolling-shutter behavior; state those limits when reporting a winner.
+- Group ties: the top two clips within `--tie-threshold` (default 3% relative RMS jitter) are marked `within_noise`. Product ranking uses the mean within-group rank plus the geometric mean of jitter-vs-best, not the raw 0-100 scores, because the exponential score compresses differences unevenly across groups.

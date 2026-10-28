@@ -263,6 +263,61 @@ uv run vsa-batch "clips/*.mp4" \
   command exits with code 1 if any input failed.
 - Shell-expanded paths and quoted glob patterns are both accepted.
 
+### Product comparison (grouped batch)
+
+`vsa-compare` compares products that recorded the same scenes, for example
+several phones filming identical handheld tests. Each scene is a group with one
+clip per product. Clips in a group are analyzed over the same time window and
+sample rate, then ranked by high-pass RMS jitter.
+
+```text
+clips/
+  scene-01/
+    phone-a.mp4
+    phone-b.mp4
+  scene-02/
+    phone-a.mp4
+    phone-b.mp4
+```
+
+```bash
+uv run vsa-compare clips --output-dir outputs/compare
+```
+
+An explicit manifest works too; `path` is resolved relative to the manifest:
+
+```csv
+path,group,product
+clips/scene-01/phone-a.mp4,scene-01,phone-a
+clips/scene-01/phone-b.mp4,scene-01,phone-b
+```
+
+```bash
+uv run vsa-compare --manifest manifest.csv --output-dir outputs/compare
+```
+
+Each product appears once per group; duplicate `(group, product)` pairs are
+rejected so one clip cannot be counted twice.
+
+- The shortest clip in a group defines the common window; `--no-align-window`
+  analyzes each clip's configured window instead.
+- Clips are resampled to the lowest group FPS, capped by `--max-sample-fps`
+  (default 30), so a 60 fps phone and a 30 fps phone are compared at the same
+  rate.
+- `comparison.json`, `clips.csv`, `products.csv`, `comparison.md`, and
+  `comparison.png` (heatmap) summarize the run.
+- `relative` is the clip's RMS jitter divided by the best clip in its group
+  (1.00 = best). Product order uses the mean within-group rank and the
+  geometric mean of that ratio.
+- A group whose best two clips are closer than `--tie-threshold` (default 3%)
+  is marked `within_noise`; `--min-confidence medium` excludes low-confidence
+  clips from the ranking.
+- Per-clip reports are written under
+  `<output-dir>/reports/<group>/<product>/report.json`.
+- Scores are still camera-only and comparable only when `--max-side`,
+  `--high-pass-cutoff-hz`, and `--reference-jitter-ratio` match. Different
+  crops or fields of view are reported, not corrected.
+
 ## Output
 
 `report.json` (schema version 2) contains:
@@ -375,6 +430,7 @@ run with a real video.
 src/video_stabilization_analyzer/
   analysis.py      orchestration and warnings
   batch.py         vsa-batch multi-video runner and summary CSV
+  compare.py       grouped product comparison, aligned windows, rankings
   cli.py           argparse entrypoint and shared option groups
   config.py        AnalysisConfig
   metrics.py       background separation, similarity camera model,
@@ -385,5 +441,5 @@ src/video_stabilization_analyzer/
   video.py         decoding, windowing, sample-rate detection
   visualization.py annotated tracking video
   tracking/        Tracker protocol, CoTracker3 adapter, chunk stitching
-tests/             synthetic-trajectory, CLI, batch, report, and video tests
+tests/             synthetic-trajectory, CLI, batch, compare, report, video tests
 ```

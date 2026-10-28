@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from video_stabilization_analyzer.video import VideoReadError, read_video
+from video_stabilization_analyzer.video import VideoReadError, probe_video, read_video
 
 
 def _write_video(path: Path, frames: int, width: int = 64, height: int = 48) -> None:
@@ -43,6 +43,19 @@ def test_read_video_samples_and_resizes(tmp_path: Path) -> None:
     assert metadata.source_height == 48
     assert metadata.width == 32
     assert metadata.height == 24
+
+
+def test_probe_video_reads_container_metadata(tmp_path: Path) -> None:
+    path = tmp_path / "input.avi"
+    _write_video(path, frames=20)
+
+    probe = probe_video(path)
+
+    assert probe.width == 64
+    assert probe.height == 48
+    assert probe.fps == pytest.approx(10.0, rel=0.1)
+    assert probe.frame_count == pytest.approx(20, abs=1)
+    assert probe.duration_seconds == pytest.approx(2.0, rel=0.1)
 
 
 def test_read_video_rejects_missing_file(tmp_path: Path) -> None:
