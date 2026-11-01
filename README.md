@@ -5,25 +5,28 @@ tracking points with CoTracker3 and analyzing the residual camera motion.
 
 ## Demo
 
-Annotated CoTracker3 tracks (green = background/camera points) and the resulting
-report card for a deliberately shaky handheld clip. The low score is the
-expected detection result, not a stabilized output:
+Annotated CoTracker3 tracks (green = background/camera points) for two clips
+analyzed with identical settings over a common 1.84 s window: a smooth handheld
+capture and a deliberately shaky one. The 95.0 vs 19.2 score gap is the detector
+working, not a stabilized output:
 
-![Annotated tracking and stability metrics for test4.mp4](docs/assets/test4-demo.gif)
+![Good and bad stabilization compared on test10.mp4 and test4.mp4](docs/assets/stability-comparison.gif)
 
-| Metric | Value |
-|---|---:|
-| Stability score | **19.2 / 100** |
-| High-pass RMS jitter | 9.91 px (0.826% of frame diagonal) |
-| P95 jitter | 19.28 px |
-| Rotation jitter | 0.20 deg |
-| Scale jitter | 0.28% |
-| Background points | 144 / 144 |
-| Evaluated frames | 43 / 53 |
-| Confidence | high |
+| Metric | test10.mp4 (good) | test4.mp4 (bad) |
+|---|---:|---:|
+| Stability score | **95.0 / 100** | **19.2 / 100** |
+| High-pass RMS jitter | 0.31 px (0.026% of diagonal) | 9.91 px (0.826% of diagonal) |
+| P95 jitter | 0.49 px | 19.28 px |
+| Rotation jitter | 0.011 deg | 0.196 deg |
+| Scale jitter | 0.007% | 0.277% |
+| Background points | 144 / 144 | 144 / 144 |
+| Evaluated frames | 46 / 56 | 43 / 53 |
+| Confidence | high | high |
 
-The source clip (`test4.mp4`) is a local test asset and is not bundled; the GIF
-is generated from the annotated tracking video written by `--output-video`.
+Both source clips are local test assets and are not bundled; the GIF is
+generated from the annotated tracking video written by `--output-video`. The
+clips show different scenes, so this illustrates how the metric separates smooth
+and shaky capture, not an A/B test of two stabilization algorithms.
 
 ## Pipeline
 
